@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EA Select Construction</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@200;300;400;500&family=Josefin+Sans:wght@100;200;300&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body, #root { height:100%; }
+  body { background:#ffffff; font-family:'Jost',sans-serif; overflow:hidden; }
+  #root { display:flex; flex-direction:column; height:100%; max-width:480px; margin:0 auto; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px; background:#ede9e3; outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:#1a1a18; cursor:pointer; }
+  ::-webkit-scrollbar { display:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+/* ── GITHUB CONFIG ─────────────────────────────────── */
+const GH_OWNER = 'edgarprogest-create';
+const GH_REPO  = 'By-Edgar-signature';
+const GH_PATH  = 'images';
+
+/* ── IMAGE STORE ───────────────────────────────────── */
+let _imgs = {}, _listeners = [];
+function getImgs() { return _imgs; }
+function setImg(key, url) { _imgs = {..._imgs, [key]: url}; _listeners.forEach(f => f(_imgs)); }
+function subImgs(fn) { _listeners.push(fn); return () => { _listeners = _listeners.filter(f => f !== fn); }; }
+async function loadImgs() {
+  const keys = ['eden','silva','bravo','quinta','serro','levante'];
+  await Promise.all(keys.map(async key => {
+    for (const ext of ['jpg','jpeg','png','webp']) {
+      const url = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${GH_PATH}/${key}.${ext}`;
+      try { const r = await fetch(url, {method:'HEAD'}); if (r.ok) { setImg(key, url+'?t='+Date.now()); break; } } catch(e) {}
+    }
+  }));
+}
+
+/* ── PALETTE ───────────────────────────────────────── */
+const C = { bg:"#ffffff", surface:"#f8f6f3", border:"#ede9e3", accent:"#8a7560", dark:"#1a1a18", mid:"#7a776f", light:"#b0aca4", tag_orange:"#f5ede4", tag_orange_t:"#a06030" };
+
+/* ── DATA ──────────────────────────────────────────── */
+const PROJECTS = [
+  { id:1, imgKey:"eden",    tipo:"T1",      nome:"Eden",    local:"Braga, Portugal",   preco:89000,  area:55,  quartos:1, wcs:1, prazo:"4 meses", materiais:"Estrutura em CLT, fachada em madeira tratada, isolamento A+", acabamentos:"Standard", estado:"Disponível",    cor:["#c9bfb0","#a89880"], desc:"Casa modular T1 de design minimalista, ideal para quem procura conforto e eficiência num espaço compacto. Certificação energética A+.", plantas:true },
+  { id:2, imgKey:"silva",   tipo:"T2",      nome:"Silva",   local:"Porto, Portugal",   preco:125000, area:80,  quartos:2, wcs:1, prazo:"5 meses", materiais:"Aço galvanizado + painel sandwich, caixilharia alumínio térmico", acabamentos:"Premium",  estado:"Em construção", cor:["#b8c4c0","#8fa89e"], desc:"Solução modular T2 com sala ampla e cozinha americana integrada. Possibilidade de expansão futura com módulos adicionais.", plantas:true },
+  { id:3, imgKey:"bravo",   tipo:"T3",      nome:"Bravo",   local:"Lisboa, Portugal",  preco:165000, area:110, quartos:3, wcs:2, prazo:"6 meses", materiais:"Betão leve + painéis fotovoltaicos integrados, telhado verde", acabamentos:"Premium",  estado:"Disponível",    cor:["#c4bdb5","#9e9088"], desc:"Projeto T3 com pé-direito duplo na sala, três suítes e terraço privativo. Solução off-grid opcional com baterias domésticas.", plantas:true },
+  { id:4, imgKey:"quinta",  tipo:"Moradia", nome:"Quinta",  local:"Cascais, Portugal", preco:230000, area:150, quartos:4, wcs:3, prazo:"8 meses", materiais:"Estrutura metálica + CLT, vidro duplo, domótica KNX integrada", acabamentos:"Luxo",     estado:"Disponível",    cor:["#bfb8ae","#8c857a"], desc:"Moradia modular de alto padrão com piscina integrada opcional. Totalmente personalizável em planta e acabamentos.", plantas:true },
+  { id:5, imgKey:"serro",   tipo:"T2",      nome:"Serro",   local:"Évora, Portugal",   preco:112000, area:75,  quartos:2, wcs:2, prazo:"5 meses", materiais:"Madeira lamelada colada, isolamento de lã de rocha, tijolo de vidro", acabamentos:"Standard", estado:"Disponível", cor:["#d4c8b8","#b0a090"], desc:"Projeto compacto e sustentável, com gestão inteligente de água e energia. Design adaptado ao clima do interior.", plantas:false },
+  { id:6, imgKey:"levante", tipo:"T3",      nome:"Levante", local:"Faro, Portugal",    preco:178000, area:120, quartos:3, wcs:2, prazo:"7 meses", materiais:"Estrutura CLT + zinco natural, varandas em betão aparente", acabamentos:"Luxo",     estado:"Vendida",       cor:["#c8c0b4","#a09080"], desc:"Moradia de três frentes com terraço panorâmico. Localização privilegiada junto ao Algarve, certificação passivhaus.", plantas:true },
+];
+const TIPOS = ["Todos","T1","T2","T3","Moradia"];
+
+/* ── PROJECT IMAGE ─────────────────────────────────── */
+function ProjectImg({ imgKey, colors, idx=0 }) {
+  const [imgs, setImgs] = useState(getImgs());
+  useEffect(() => subImgs(i => setImgs({...i})), []);
+  const url = imgs[imgKey];
+  if (url) return <img src={url} alt={imgKey} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />;
+  const w=400, h=260;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width:'100%', height:'100%', display:'block' }}>
+      <defs><linearGradient id={`g${idx}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={colors[0]}/><stop offset="100%" stopColor={colors[1]}/></linearGradient></defs>
+      <rect width={w} height={h} fill={`url(#g${idx})`}/>
+      <rect x="60" y="120" width="50" height="140" fill="rgba(255,255,255,0.12)" rx="2"/>
+      <rect x="120" y="80" width="80" height="180" fill="rgba(255,255,255,0.10)" rx="2"/>
+      <rect x="210" y="100" width="60" height="160" fill="rgba(255,255,255,0.08)" rx="2"/>
+      <rect x="280" y="140" width="40" height="120" fill="rgba(255,255,255,0.10)" rx="2"/>
+      {[0,1,2].map(r=>[0,1].map(c=><rect key={`${r}-${c}`} x={130+c*28} y={95+r*36} width={18} height={22} fill="rgba(255,255,255,0.22)" rx="1"/>))}
+      <ellipse cx="55" cy="235" rx="30" ry="18" fill="rgba(80,120,70,0.25)"/>
+      <ellipse cx="350" cy="238" rx="22" ry="14" fill="rgba(80,120,70,0.2)"/>
+    </svg>
+  );
+}
+
+/* ── HOME ──────────────────────────────────────────── */
+function HomeScreen({ onSelect }) {
+  const [filtro, setFiltro] = useState("Todos");
+  useEffect(() => { loadImgs(); }, []);
+  const filtered = filtro === "Todos" ? PROJECTS : PROJECTS.filter(p => p.tipo === filtro);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", background:C.bg }}>
+      <div style={{ padding:"16px 20px 12px", borderBottom:`0.5px solid ${C.border}`, flexShrink:0 }}>
+        <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:14, marginBottom:14 }}>
+          <div style={{ fontFamily:"'Josefin Sans',sans-serif", fontWeight:300, fontSize:9, letterSpacing:"3px", textTransform:"uppercase", lineHeight:1.7, textAlign:"right" }}>EA Select<br/>Construction</div>
+          <div style={{ width:1, height:36, background:"#000", flexShrink:0 }}></div>
+          <div style={{ fontFamily:"'Josefin Sans',sans-serif", fontWeight:300, fontSize:9, letterSpacing:"3px", textTransform:"uppercase", lineHeight:1.7 }}>Business<br/>Development<br/>Consultant</div>
+        </div>
+        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:2 }}>
+          {TIPOS.map(t => (
+            <button key={t} onClick={() => setFiltro(t)} style={{ flexShrink:0, padding:"6px 16px", borderRadius:20, border:filtro===t?"none":`0.5px solid ${C.border}`, background:filtro===t?C.dark:C.bg, color:filtro===t?"#fff":C.mid, fontSize:10, fontFamily:"'Jost',sans-serif", fontWeight:300, letterSpacing:"1.5px", textTransform:"uppercase", cursor:"pointer" }}>{t}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding:"10px 20px 4px", flexShrink:0 }}>
+        <span style={{ fontSize:10, color:C.light, letterSpacing:"1px", textTransform:"uppercase" }}>{filtered.length} projeto{filtered.length!==1?"s":""}</span>
+      </div>
+
+      <div style={{ flex:1, overflowY:"auto", padding:"6px 16px 24px" }}>
+        {filtered.map(p => (
+          <div key={p.id} onClick={() => onSelect(p)} style={{ background:C.bg, borderRadius:16, overflow:"hidden", border:`0.5px solid ${C.border}`, boxShadow:"0 2px 16px rgba(0,0,0,0.05)", cursor:"pointer", marginBottom:14 }}>
+            <div style={{ height:180, overflow:"hidden", position:"relative" }}>
+              <ProjectImg imgKey={p.imgKey} colors={p.cor} idx={p.id} />
+              <div style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.9)", borderRadius:20, padding:"3px 10px", fontSize:9, letterSpacing:"1.5px", textTransform:"uppercase", color:C.mid }}>{p.tipo}</div>
+            </div>
+            <div style={{ padding:"12px 14px 14px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div>
+                  <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, fontWeight:300, color:C.dark }}>{p.nome}</div>
+                  <div style={{ fontSize:10, color:C.light, marginTop:2 }}>{p.local}</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontFamily:"'Jost',sans-serif", fontSize:16, fontWeight:400, color:C.dark }}>€{p.preco.toLocaleString("pt-PT")}</div>
+                  <div style={{ fontSize:9, color:C.light }}>base</div>
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:14, marginTop:10 }}>
+                {[`${p.area} m²`, `${p.quartos} quartos`, `${p.wcs} WC`, p.prazo].map(s => (
+                  <span key={s} style={{ fontSize:10, color:C.mid }}>{s}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div style={{ borderRadius:16, overflow:"hidden", border:`0.5px solid ${C.border}` }}>
+          <div style={{ background:C.dark, padding:"20px 18px 16px" }}>
+            <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", letterSpacing:"2.5px", textTransform:"uppercase", marginBottom:4 }}>Os nossos valores</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontStyle:"italic", fontSize:20, color:"#fff", fontWeight:300 }}>Os princípios da nossa marca</div>
+          </div>
+          {[
+            { n:"01", title:"Encontramos um Construtor", desc:"Mantemos os seus melhores interesses no centro de tudo o que fazemos. As nossas construtoras convidam a visitar as instalações para imaginar o futuro do seu lar, sem compromisso." },
+            { n:"02", title:"Obter Financiamento", desc:"Verificamos as opções reais de financiamento antes de começar a construir, com os bancos a nível nacional e os melhores em termos de condições de financiamento." },
+            { n:"03", title:"Iniciar Construção", desc:"Escolha o método de construção certo para o seu projeto — LSF, Estrutura de Madeira, Estrutura de Aço ou Construção 3D." },
+            { n:"04", title:"Acompanhamento Contínuo", desc:"Estamos consigo durante toda a obra e após a sua conclusão. A nossa relação não termina com a entrega das chaves." },
+          ].map((s,i,arr) => (
+            <div key={s.n} style={{ padding:"16px 18px", borderBottom:i<arr.length-1?`0.5px solid ${C.border}`:"none", background:C.bg, display:"flex", gap:14 }}>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, fontWeight:300, color:C.border, lineHeight:1, flexShrink:0 }}>{s.n}</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:400, color:C.dark, marginBottom:5 }}>{s.title}</div>
+                <div style={{ fontSize:10, color:C.mid, lineHeight:1.7, fontWeight:300 }}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ background:C.dark, padding:"18px 18px 24px" }}>
+            <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", letterSpacing:"2.5px", textTransform:"uppercase", marginBottom:12 }}>Contacto</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontStyle:"italic", fontSize:18, color:"#fff", marginBottom:2 }}>EA Select Construction</div>
+            <div style={{ fontSize:9, color:"rgba(255,255,255,0.5)", letterSpacing:"2px", textTransform:"uppercase", marginBottom:14 }}>Business Development Consultant</div>
+            {[
+              { label:"apoio@easelectconstruction.com", href:"mailto:apoio@easelectconstruction.com" },
+              { label:"913 523 088", href:"tel:+351913523088" },
+              { label:"LinkedIn Profile", href:"https://linkedin.com" },
+            ].map(l => (
+              <a key={l.label} href={l.href} style={{ fontSize:11, color:"rgba(255,255,255,0.6)", textDecoration:"none", display:"flex", alignItems:"center", gap:8, fontWeight:300, marginBottom:8 }}>
+                <span style={{ width:4, height:4, borderRadius:"50%", background:C.accent, flexShrink:0, display:"inline-block" }}></span>{l.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── DETAIL ────────────────────────────────────────── */
+function DetailScreen({ project:p, onBack }) {
+  const [shared, setShared] = useState(false);
+  function handleShare() {
+    const txt = `EA Select — ${p.nome} (${p.tipo})\n${p.area}m² · ${p.quartos} quartos · €${p.preco.toLocaleString("pt-PT")}\n${p.local}`;
+    if (navigator.share) navigator.share({ title:`${p.nome} — EA Select`, text:txt });
+    else { navigator.clipboard?.writeText(txt); setShared(true); setTimeout(()=>setShared(false),2000); }
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", background:C.bg }}>
+      <div style={{ position:"relative", height:260, flexShrink:0 }}>
+        <ProjectImg imgKey={p.imgKey} colors={p.cor} idx={p.id*10} />
+        <button onClick={onBack} style={{ position:"absolute", top:16, left:16, width:38, height:38, borderRadius:"50%", background:"rgba(255,255,255,0.92)", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <svg width="16" height="16" fill="none" stroke={C.dark} strokeWidth="1.8" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button onClick={handleShare} style={{ position:"absolute", top:16, right:16, width:38, height:38, borderRadius:"50%", background:shared?C.dark:"rgba(255,255,255,0.92)", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          {shared
+            ? <svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width="14" height="14" fill="none" stroke={C.dark} strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          }
+        </button>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", paddingBottom:20 }}>
+        <div style={{ padding:"16px 20px 14px", borderBottom:`0.5px solid ${C.border}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, fontWeight:300, color:C.dark, lineHeight:1.1 }}>{p.nome}</div>
+              <div style={{ fontSize:10, color:C.light, marginTop:3 }}>{p.local} · {p.tipo}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontFamily:"'Jost',sans-serif", fontSize:20, fontWeight:400, color:C.dark }}>€{p.preco.toLocaleString("pt-PT")}</div>
+              <div style={{ fontSize:9, color:C.light }}>preço base</div>
+            </div>
+          </div>
+          <p style={{ fontSize:12, color:C.mid, lineHeight:1.65, marginTop:12, fontWeight:300 }}>{p.desc}</p>
+        </div>
+        <div style={{ padding:"14px 20px", borderBottom:`0.5px solid ${C.border}` }}>
+          <div style={{ fontSize:9, letterSpacing:"2px", textTransform:"uppercase", color:C.light, marginBottom:12 }}>Especificações</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {[{label:"Área total",value:`${p.area} m²`},{label:"Quartos",value:p.quartos},{label:"WCs",value:p.wcs},{label:"Prazo",value:p.prazo},{label:"Acabamentos",value:p.acabamentos},{label:"Estado",value:p.estado}].map(s => (
+              <div key={s.label} style={{ background:C.surface, borderRadius:10, padding:"10px 12px" }}>
+                <div style={{ fontSize:9, color:C.light, letterSpacing:"1px", textTransform:"uppercase", marginBottom:4 }}>{s.label}</div>
+                <div style={{ fontSize:13, color:C.dark, fontWeight:300 }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ padding:"14px 20px", borderBottom:`0.5px solid ${C.border}` }}>
+          <div style={{ fontSize:9, letterSpacing:"2px", textTransform:"uppercase", color:C.light, marginBottom:10 }}>Materiais & Construção</div>
+          <p style={{ fontSize:12, color:C.mid, lineHeight:1.7, fontWeight:300 }}>{p.materiais}</p>
+        </div>
+        <div style={{ padding:"14px 20px", borderBottom:`0.5px solid ${C.border}` }}>
+          <div style={{ fontSize:9, letterSpacing:"2px", textTransform:"uppercase", color:C.light, marginBottom:10 }}>Plantas</div>
+          {p.plantas ? (
+            <div style={{ background:C.surface, borderRadius:12, height:110, display:"flex", alignItems:"center", justifyContent:"center", border:`0.5px solid ${C.border}` }}>
+              <svg viewBox="0 0 220 90" width="200" height="80">
+                <rect x="10" y="10" width="200" height="70" fill="none" stroke={C.border} strokeWidth="1"/>
+                <rect x="10" y="10" width="90" height="70" fill="none" stroke={C.light} strokeWidth="0.8"/>
+                <rect x="100" y="10" width="60" height="40" fill="none" stroke={C.light} strokeWidth="0.8"/>
+                <rect x="100" y="50" width="60" height="30" fill="none" stroke={C.light} strokeWidth="0.8"/>
+                <rect x="160" y="10" width="50" height="70" fill="none" stroke={C.light} strokeWidth="0.8"/>
+                <path d="M55 10 A20 20 0 0 1 75 30" fill="none" stroke={C.light} strokeWidth="0.6"/>
+                <text x="35" y="50" fontSize="6" fill={C.light} textAnchor="middle">Sala</text>
+                <text x="128" y="32" fontSize="6" fill={C.light} textAnchor="middle">Quarto</text>
+                <text x="128" y="68" fontSize="6" fill={C.light} textAnchor="middle">WC</text>
+                <text x="183" y="50" fontSize="6" fill={C.light} textAnchor="middle">Coz.</text>
+              </svg>
+            </div>
+          ) : (
+            <div style={{ background:C.surface, borderRadius:12, height:80, display:"flex", alignItems:"center", justifyContent:"center", border:`0.5px solid ${C.border}` }}>
+              <span style={{ fontSize:10, color:C.light }}>Plantas em breve</span>
+            </div>
+          )}
+        </div>
+        <div style={{ padding:"16px 20px" }}>
+          <button onClick={handleShare} style={{ width:"100%", padding:"14px", borderRadius:12, background:C.dark, border:"none", color:"#fff", fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:300, letterSpacing:"2.5px", textTransform:"uppercase", cursor:"pointer" }}>
+            {shared?"Copiado!":"Partilhar Projeto"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── CALCULATOR ────────────────────────────────────── */
+function CalcScreen() {
+  const [tipo, setTipo] = useState("LSF");
+  const [area, setArea] = useState(80);
+  const [acab, setAcab] = useState("Standard");
+  const [infoOpen, setInfoOpen] = useState(false);
+  const TIPOS_CONST = [
+    { key:"LSF",     label:"Estrutura de Aço Leve (LSF)", min:1100, max:1600 },
+    { key:"Madeira", label:"Estrutura de Madeira",        min:1200, max:2000 },
+    { key:"CLT",     label:"Madeira Laminada (CLT)",      min:1300, max:2500 },
+  ];
+  const mult = { Standard:1, Premium:1.2, Luxo:1.5 };
+  const tipoData = TIPOS_CONST.find(t => t.key === tipo);
+  const estMin = Math.round(area * tipoData.min * mult[acab] / 1000) * 1000;
+  const estMax = Math.round(area * tipoData.max * mult[acab] / 1000) * 1000;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", background:C.bg }}>
+      <div style={{ padding:"16px 20px 14px", borderBottom:`0.5px solid ${C.border}`, flexShrink:0 }}>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontStyle:"italic", fontSize:22, color:C.dark }}>Calculadora</div>
+        <div style={{ fontSize:9, color:C.light, letterSpacing:"2px", textTransform:"uppercase", marginTop:2 }}>Estimativa de Orçamento</div>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"20px 20px 24px", display:"flex", flexDirection:"column", gap:22 }}>
+        <div>
+          <div style={{ fontSize:9, color:C.light, letterSpacing:"2px", textTransform:"uppercase", marginBottom:10 }}>Tipo de Construção</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {TIPOS_CONST.map(t => (
+              <button key={t.key} onClick={() => setTipo(t.key)} style={{ padding:"12px 14px", borderRadius:10, border:`0.5px solid ${tipo===t.key?C.dark:C.border}`, background:tipo===t.key?C.dark:C.bg, textAlign:"left", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:12, color:tipo===t.key?"#fff":C.dark, fontWeight:300 }}>{t.label}</span>
+                <span style={{ fontSize:10, color:tipo===t.key?"rgba(255,255,255,0.6)":C.light, fontWeight:300, marginLeft:8 }}>{t.min.toLocaleString("pt-PT")} – {t.max.toLocaleString("pt-PT")} €/m²</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+            <div style={{ fontSize:9, color:C.light, letterSpacing:"2px", textTransform:"uppercase" }}>Área</div>
+            <div style={{ fontSize:14, color:C.dark, fontWeight:400 }}>{area} m²</div>
+          </div>
+          <input type="range" min="40" max="250" step="5" value={area} onChange={e => setArea(+e.target.value)} />
+          <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
+            <span style={{ fontSize:9, color:C.light }}>40 m²</span>
+            <span style={{ fontSize:9, color:C.light }}>250 m²</span>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize:9, color:C.light, letterSpacing:"2px", textTransform:"uppercase", marginBottom:10 }}>Nível de Acabamentos</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {[{key:"Standard",desc:"Materiais de qualidade, funcionais e duráveis"},{key:"Premium",desc:"Caixilharia de alto desempenho, isolamento A+"},{key:"Luxo",desc:"Domótica, materiais nobres, personalização total"}].map(a => (
+              <button key={a.key} onClick={() => setAcab(a.key)} style={{ padding:"12px 14px", borderRadius:12, border:`0.5px solid ${acab===a.key?C.dark:C.border}`, background:acab===a.key?C.dark:C.bg, textAlign:"left", cursor:"pointer" }}>
+                <div style={{ fontSize:12, color:acab===a.key?"#fff":C.dark, fontWeight:400, marginBottom:3 }}>{a.key}</div>
+                <div style={{ fontSize:10, color:acab===a.key?"rgba(255,255,255,0.6)":C.light, fontWeight:300 }}>{a.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ borderRadius:14, border:`0.5px solid ${C.border}`, overflow:"hidden" }}>
+          <button onClick={() => setInfoOpen(o=>!o)} style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", background:"none", border:"none", cursor:"pointer" }}>
+            <span style={{ fontSize:10, color:C.mid, letterSpacing:"1px", textTransform:"uppercase", fontWeight:300 }}>Referência de Preços por m² + IVA</span>
+            <svg width="12" height="12" fill="none" stroke={C.light} strokeWidth="1.5" viewBox="0 0 24 24" style={{ transform:infoOpen?"rotate(180deg)":"none", transition:"transform 0.2s", flexShrink:0 }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {infoOpen && <div style={{ borderTop:`0.5px solid ${C.border}` }}>
+            {[{label:"Estrutura de Aço Leve (LSF)",range:"1.100 – 1.600 €/m²"},{label:"Estrutura de Madeira",range:"1.200 – 2.000 €/m²"},{label:"Madeira Laminada (CLT)",range:"1.200 – 2.500 €/m²"}].map((row,i,arr) => (
+              <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderBottom:i<arr.length-1?`0.5px solid ${C.border}`:"none", background:C.surface }}>
+                <span style={{ fontSize:11, color:C.mid, fontWeight:300 }}>{row.label}</span>
+                <span style={{ fontSize:11, color:C.dark, fontWeight:400, flexShrink:0, marginLeft:12 }}>{row.range}</span>
+              </div>
+            ))}
+          </div>}
+        </div>
+        <div style={{ background:C.surface, borderRadius:16, padding:"20px", border:`0.5px solid ${C.border}` }}>
+          <div style={{ fontSize:9, color:C.light, letterSpacing:"2px", textTransform:"uppercase", marginBottom:8 }}>Estimativa Base</div>
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, fontWeight:300, color:C.dark }}>€{estMin.toLocaleString("pt-PT")} – €{estMax.toLocaleString("pt-PT")}</div>
+          <div style={{ fontSize:10, color:C.light, marginTop:6, lineHeight:1.6, fontWeight:300 }}>{tipoData.label} · {area}m² · Acabamentos {acab}<br/>Inclui estrutura, instalações e entrega chave-na-mão.</div>
+          <div style={{ marginTop:12, padding:"8px 12px", background:C.tag_orange, borderRadius:8 }}>
+            <div style={{ fontSize:9, color:C.tag_orange_t, lineHeight:1.6, fontWeight:300 }}>⚠ Valor indicativo. Orçamento final depende do terreno, localização e personalizações.</div>
+          </div>
+          <button onClick={() => {
+            const msg = `Olá Edgar! Fiz uma simulação:%0A%0A🏗 ${tipoData.label}%0A📐 ${area} m²%0A✨ ${acab}%0A💶 €${estMin.toLocaleString("pt-PT")} – €${estMax.toLocaleString("pt-PT")}%0A%0AGostaria de receber uma proposta detalhada.`;
+            window.open(`https://wa.me/351913523088?text=${msg}`, "_blank");
+          }} style={{ marginTop:12, width:"100%", padding:"14px", borderRadius:12, background:"#25D366", border:"none", color:"#fff", fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:300, letterSpacing:"2px", textTransform:"uppercase", cursor:"pointer" }}>
+            Pedir Proposta via WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── BOTTOM NAV ────────────────────────────────────── */
+function BottomNav({ tab, setTab }) {
+  const items = [
+    { key:"home", label:"Projetos", icon:<svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg> },
+    { key:"calc", label:"Orçamento", icon:<svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg> },
+    { key:"wa", label:"WhatsApp", isLink:true, icon:<svg width="22" height="22" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#25D366"/><path d="M23.5 8.5A10.4 10.4 0 0 0 16 5.5C10.2 5.5 5.5 10.2 5.5 16c0 1.8.5 3.6 1.4 5.2L5.5 26.5l5.5-1.4A10.5 10.5 0 0 0 16 26.5c5.8 0 10.5-4.7 10.5-10.5 0-2.8-1.1-5.4-3-7.5zm-7.5 16.1a8.7 8.7 0 0 1-4.4-1.2l-.3-.2-3.2.8.9-3.1-.2-.3A8.7 8.7 0 0 1 7.3 16c0-4.8 3.9-8.7 8.7-8.7 2.3 0 4.5.9 6.1 2.5a8.6 8.6 0 0 1 2.6 6.2c0 4.8-3.9 8.6-8.7 8.6zm4.8-6.5c-.3-.1-1.6-.8-1.8-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.8-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.6.2-.4v-.4l-.9-2.1c-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.6-.7 1.8-1.3.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.6-.3z" fill="#fff"/></svg> },
+  ];
+  return (
+    <div style={{ display:"flex", borderTop:`0.5px solid ${C.border}`, background:C.bg, flexShrink:0, paddingBottom:"env(safe-area-inset-bottom)" }}>
+      {items.map(item => item.isLink ? (
+        <a key={item.key} href="https://wa.me/351913523088" target="_blank" rel="noopener noreferrer" style={{ flex:1, padding:"10px 0 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:3, textDecoration:"none", color:C.light }}>
+          {item.icon}
+          <span style={{ fontSize:9, letterSpacing:"1px", textTransform:"uppercase", fontWeight:300, color:C.light }}>{item.label}</span>
+        </a>
+      ) : (
+        <button key={item.key} onClick={() => setTab(item.key)} style={{ flex:1, padding:"10px 0 8px", border:"none", background:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3, color:tab===item.key?C.dark:C.light }}>
+          {item.icon}
+          <span style={{ fontSize:9, letterSpacing:"1px", textTransform:"uppercase", fontWeight:300 }}>{item.label}</span>
+          {tab===item.key && <div style={{ width:16, height:2, background:C.accent, borderRadius:1 }} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── APP ───────────────────────────────────────────── */
+function App() {
+  const [tab, setTab] = useState("home");
+  const [detail, setDetail] = useState(null);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+      <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+        {detail ? <DetailScreen project={detail} onBack={() => setDetail(null)} />
+          : tab === "home" ? <HomeScreen onSelect={p => setDetail(p)} />
+          : <CalcScreen />}
+      </div>
+      {!detail && <BottomNav tab={tab} setTab={setTab} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
